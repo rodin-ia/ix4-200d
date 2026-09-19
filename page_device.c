@@ -122,7 +122,7 @@ void page_device(void)
         snprintf(
             line,
             sizeof(line),
-            "IP: %s",
+            "IP: %.17s",
             ips[i]
         );
 
