@@ -62,7 +62,7 @@ void menu_page(int page)
         break;
 
     case 1:
-        if (detail)
+        if (detail == 1 || detail == 2)
             page_space_detail();
         else
             page_space();
