@@ -187,27 +187,39 @@ static void get_raid_status(
         if (strcmp(md, "md0") != 0)
             continue;
 
+        /*
+         * The first [N] is the number of RAID devices.
+         * The second [...] is the actual RAID bitmap.
+         */
         {
             char *p;
+            char *end;
 
             p = strchr(line, '[');
 
-            if (p) {
-                char *end;
+            if (!p)
+                break;
 
-                end = strchr(p, ']');
+            p = strchr(p + 1, '[');
 
-                if (end) {
-                    size_t len;
+            if (!p)
+                break;
 
-                    len = (size_t)(end - p + 1);
+            end = strchr(p, ']');
 
-                    if (len >= size)
-                        len = size - 1;
+            if (!end)
+                break;
 
-                    memcpy(status, p, len);
-                    status[len] = '\0';
-                }
+            {
+                size_t len;
+
+                len = (size_t)(end - p + 1);
+
+                if (len >= size)
+                    len = size - 1;
+
+                memcpy(status, p, len);
+                status[len] = '\0';
             }
         }
 
