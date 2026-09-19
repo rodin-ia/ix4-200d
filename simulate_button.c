@@ -125,7 +125,7 @@ void detail_next(void)
     detail = detail_get();
 
     /*
-     * Currently only ARRAY has a detail menu.
+     * Only ARRAY currently has detail screens.
      */
     if (page != 1)
         return;
@@ -136,6 +136,7 @@ void detail_next(void)
         detail = DETAIL_MIN;
 
     detail_set(detail);
+
     menu_page(page);
 }
 
