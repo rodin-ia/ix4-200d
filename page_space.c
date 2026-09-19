@@ -1,355 +1,272 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "ix4lcd.h"
 
 struct raid_info {
     char device[32];
     char level[32];
+    char state[128];
+    char rebuild[64];
 
-    int raid_disks;
-    int degraded;
-    int active;
-
-    char sync_action[32];
-    char sync_completed[64];
-    char sync_speed[64];
+    int raid_devices;
+    int total_devices;
+    int active_devices;
+    int working_devices;
+    int failed_devices;
+    int spare_devices;
 };
 
-static int read_sysfs(const char *device,
-                      const char *file,
-                      char *buf,
-                      size_t size)
+static void trim(char *s)
 {
-    char path[256];
-    FILE *f;
+    char *start;
+    char *end;
 
-    snprintf(path,
-             sizeof(path),
-             "/sys/class/block/%s/md/%s",
-             device,
-             file);
+    start = s;
 
-    f = fopen(path, "r");
+    while (*start && isspace((unsigned char)*start))
+        start++;
 
-    if (!f)
+    if (start != s)
+        memmove(s, start, strlen(start) + 1);
+
+    end = s + strlen(s);
+
+    while (end > s && isspace((unsigned char)*(end - 1)))
+        end--;
+
+    *end = '\0';
+}
+
+static int parse_int_field(const char *line, const char *field)
+{
+    const char *p;
+
+    p = strstr(line, field);
+    if (!p)
         return -1;
 
-    if (!fgets(buf, size, f)) {
-        fclose(f);
+    p += strlen(field);
+
+    while (*p && (*p == ':' || isspace((unsigned char)*p)))
+        p++;
+
+    return atoi(p);
+}
+
+static int parse_string_field(
+    const char *line,
+    const char *field,
+    char *out,
+    size_t out_size)
+{
+    const char *p;
+
+    p = strstr(line, field);
+    if (!p)
         return -1;
-    }
 
-    fclose(f);
+    p += strlen(field);
 
-    buf[strcspn(buf, "\r\n")] = '\0';
+    while (*p && (*p == ':' || isspace((unsigned char)*p)))
+        p++;
+
+    snprintf(out, out_size, "%s", p);
+    trim(out);
 
     return 0;
 }
 
-static int read_sysfs_int(const char *device,
-                          const char *file)
-{
-    char buf[64];
-
-    if (read_sysfs(device,
-                   file,
-                   buf,
-                   sizeof(buf)) != 0)
-        return -1;
-
-    return atoi(buf);
-}
-
-static void uppercase(char *str)
-{
-    for (int i = 0; str[i]; i++) {
-        if (str[i] >= 'a' &&
-            str[i] <= 'z')
-            str[i] -= 'a' - 'A';
-    }
-}
-
-static int find_raid(struct raid_info *raid)
+static int find_md_device(char *device, size_t size)
 {
     FILE *f;
-    char line[512];
-
-    memset(raid, 0, sizeof(*raid));
+    char line[256];
+    char md[32];
 
     f = fopen("/proc/mdstat", "r");
-
     if (!f)
         return -1;
 
-    /*
-     * Find the first md array.
-     *
-     * Example:
-     *
-     * md0 : active raid10 sda1[0] ...
-     */
-
     while (fgets(line, sizeof(line), f)) {
-
-        char md[32];
-        char state[32];
-
-        if (sscanf(line,
-                   "%31s : %31s",
-                   md,
-                   state) != 2)
+        if (sscanf(line, "%31s", md) != 1)
             continue;
 
         if (strncmp(md, "md", 2) != 0)
             continue;
 
-        snprintf(raid->device,
-                 sizeof(raid->device),
-                 "%s",
-                 md);
+        if (!isdigit((unsigned char)md[2]))
+            continue;
 
-        if (strcmp(state, "active") == 0)
-            raid->active = 1;
+        snprintf(device, size, "/dev/%s", md);
 
-        break;
+        fclose(f);
+        return 0;
     }
 
     fclose(f);
 
-    if (raid->device[0] == '\0')
+    return -1;
+}
+
+static int get_raid_info(const char *device, struct raid_info *info)
+{
+    FILE *f;
+    char command[128];
+    char line[256];
+
+    memset(info, 0, sizeof(*info));
+
+    snprintf(info->device, sizeof(info->device), "%s", device);
+
+    snprintf(
+        command,
+        sizeof(command),
+        "mdadm --detail %s 2>/dev/null",
+        device
+    );
+
+    f = popen(command, "r");
+    if (!f)
         return -1;
 
-    /*
-     * RAID level.
-     */
+    while (fgets(line, sizeof(line), f)) {
 
-    if (read_sysfs(raid->device,
-                   "level",
-                   raid->level,
-                   sizeof(raid->level)) != 0) {
+        if (strstr(line, "Raid Level")) {
+            parse_string_field(
+                line,
+                "Raid Level",
+                info->level,
+                sizeof(info->level)
+            );
+        }
 
-        snprintf(raid->level,
-                 sizeof(raid->level),
-                 "UNKNOWN");
+        else if (strstr(line, "State")) {
+            parse_string_field(
+                line,
+                "State",
+                info->state,
+                sizeof(info->state)
+            );
+        }
+
+        else if (strstr(line, "Rebuild Status")) {
+            parse_string_field(
+                line,
+                "Rebuild Status",
+                info->rebuild,
+                sizeof(info->rebuild)
+            );
+        }
+
+        else if (strstr(line, "Raid Devices")) {
+            info->raid_devices =
+                parse_int_field(line, "Raid Devices");
+        }
+
+        else if (strstr(line, "Total Devices")) {
+            info->total_devices =
+                parse_int_field(line, "Total Devices");
+        }
+
+        else if (strstr(line, "Active Devices")) {
+            info->active_devices =
+                parse_int_field(line, "Active Devices");
+        }
+
+        else if (strstr(line, "Working Devices")) {
+            info->working_devices =
+                parse_int_field(line, "Working Devices");
+        }
+
+        else if (strstr(line, "Failed Devices")) {
+            info->failed_devices =
+                parse_int_field(line, "Failed Devices");
+        }
+
+        else if (strstr(line, "Spare Devices")) {
+            info->spare_devices =
+                parse_int_field(line, "Spare Devices");
+        }
     }
 
-    uppercase(raid->level);
+    pclose(f);
 
-    /*
-     * Number of RAID disks.
-     */
-
-    raid->raid_disks =
-        read_sysfs_int(raid->device,
-                       "raid_disks");
-
-    /*
-     * Number of degraded disks.
-     */
-
-    raid->degraded =
-        read_sysfs_int(raid->device,
-                       "degraded");
-
-    /*
-     * Current synchronization operation.
-     *
-     * Possible values:
-     *
-     * idle
-     * resync
-     * recovery
-     * reshape
-     * check
-     * repair
-     */
-
-    if (read_sysfs(raid->device,
-                   "sync_action",
-                   raid->sync_action,
-                   sizeof(raid->sync_action)) != 0) {
-
-        snprintf(raid->sync_action,
-                 sizeof(raid->sync_action),
-                 "idle");
-    }
-
-    uppercase(raid->sync_action);
-
-    /*
-     * Synchronization progress.
-     *
-     * Format:
-     *
-     * completed_sectors / total_sectors
-     *
-     * Example:
-     *
-     * 16298240 / 976628736
-     */
-
-    if (read_sysfs(raid->device,
-                   "sync_completed",
-                   raid->sync_completed,
-                   sizeof(raid->sync_completed)) != 0) {
-
-        raid->sync_completed[0] = '\0';
-    }
-
-    /*
-     * Synchronization speed.
-     */
-
-    if (read_sysfs(raid->device,
-                   "sync_speed",
-                   raid->sync_speed,
-                   sizeof(raid->sync_speed)) != 0) {
-
-        raid->sync_speed[0] = '\0';
-    }
+    if (info->raid_devices <= 0)
+        return -1;
 
     return 0;
 }
 
-static double sync_percent(const char *completed)
+static int get_rebuild_percent(const char *rebuild)
 {
-    unsigned long long done;
-    unsigned long long total;
+    const char *p;
 
-    if (!completed || !completed[0])
-        return -1.0;
+    if (!rebuild || !*rebuild)
+        return -1;
 
-    if (sscanf(completed,
-               "%llu / %llu",
-               &done,
-               &total) != 2)
-        return -1.0;
+    p = rebuild;
 
-    if (total == 0)
-        return -1.0;
+    while (*p && !isdigit((unsigned char)*p))
+        p++;
 
-    return ((double)done * 100.0) /
-           (double)total;
+    if (!*p)
+        return -1;
+
+    return atoi(p);
 }
 
 void page_space(void)
 {
-    struct raid_info raid;
+    struct raid_info info;
+    char device[32];
     char line[64];
+    const char *short_device;
+    int rebuild;
 
     menu_title("ARRAY");
 
-    /*
-     * No RAID array.
-     */
-
-    if (find_raid(&raid) != 0) {
-
-        menu_line(2, "ARRAY: N/A");
+    if (find_md_device(device, sizeof(device)) != 0) {
+        menu_line(3, "ARRAY: N/A");
         menu_line(4, "STATE: OFFLINE");
         menu_line(5, "HEALTH: UNKNOWN");
-
+        menu_line(6, "DEVICES: N/A");
         return;
     }
 
-    /*
-     * ARRAY: md0
-     */
-
-    snprintf(line,
-             sizeof(line),
-             "ARRAY: %s",
-             raid.device);
-
-    menu_line(2, line);
-
-    /*
-     * LEVEL: RAID10
-     */
-
-    snprintf(line,
-             sizeof(line),
-             "LEVEL: %s",
-             raid.level);
-
-    menu_line(3, line);
-
-    /*
-     * STATE: ACTIVE
-     */
-
-    if (raid.active)
-        menu_line(4, "STATE: ACTIVE");
-    else
-        menu_line(4, "STATE: INACTIVE");
-
-    /*
-     * Synchronization / health.
-     */
-
-    if (strcmp(raid.sync_action, "IDLE") != 0 &&
-        raid.sync_action[0] != '\0') {
-
-        double percent =
-            sync_percent(raid.sync_completed);
-
-        if (percent >= 0.0) {
-
-            snprintf(line,
-                     sizeof(line),
-                     "%s: %.1f%%",
-                     raid.sync_action,
-                     percent);
-
-            menu_line(5, line);
-
-        } else {
-
-            snprintf(line,
-                     sizeof(line),
-                     "%s",
-                     raid.sync_action);
-
-            menu_line(5, line);
-        }
-
-    } else if (raid.degraded > 0) {
-
-        menu_line(5, "HEALTH: DEGRADED");
-
-    } else if (raid.degraded == 0) {
-
-        menu_line(5, "HEALTH: OK");
-
-    } else {
-
+    if (get_raid_info(device, &info) != 0) {
+        menu_line(3, "ARRAY: N/A");
+        menu_line(4, "STATE: UNKNOWN");
         menu_line(5, "HEALTH: UNKNOWN");
+        menu_line(6, "DEVICES: N/A");
+        return;
     }
 
-    /*
-     * DISKS: 4/4
-     */
+    short_device = device;
 
-    if (raid.raid_disks > 0) {
+    if (strncmp(device, "/dev/", 5) == 0)
+        short_device = device + 5;
 
-        int online =
-            raid.raid_disks - raid.degraded;
+    snprintf(line, sizeof(line), "ARRAY: %s", short_device);
+    menu_line(3, line);
 
-        if (online < 0)
-            online = 0;
+    snprintf(line, sizeof(line), "LEVEL: %s", info.level);
+    menu_line(4, line);
 
-        snprintf(line,
-                 sizeof(line),
-                 "DISKS: %d/%d",
-                 online,
-                 raid.raid_disks);
+    snprintf(line, sizeof(line), "STATE: %s", info.state);
+    menu_line(5, line);
 
+    rebuild = get_rebuild_percent(info.rebuild);
+
+    if (rebuild >= 0) {
+        snprintf(line, sizeof(line), "REBUILD: %d%%", rebuild);
         menu_line(6, line);
-
+    } else if (strcmp(info.state, "clean") == 0) {
+        menu_line(6, "HEALTH: OK");
+    } else if (strstr(info.state, "degraded")) {
+        menu_line(6, "HEALTH: DEGRADED");
     } else {
-
-        menu_line(6, "DISKS: UNKNOWN");
+        menu_line(6, "HEALTH: UNKNOWN");
     }
 }
