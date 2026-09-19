@@ -162,6 +162,7 @@ static void get_raid_status(
 {
     FILE *f;
     char line[256];
+    int found_md0 = 0;
 
     snprintf(status, size, "N/A");
 
@@ -172,58 +173,104 @@ static void get_raid_status(
 
     while (fgets(line, sizeof(line), f)) {
 
-        char md[32];
-        char level[32];
-        char bitmap[32];
+        if (!found_md0) {
+            char md[32];
 
-        if (sscanf(
-                line,
-                "%31s : %31s %31s",
-                md,
-                level,
-                bitmap) != 3)
-            continue;
+            if (sscanf(
+                    line,
+                    "%31s :",
+                    md) == 1 &&
+                strcmp(md, "md0") == 0) {
 
-        if (strcmp(md, "md0") != 0)
+                found_md0 = 1;
+            }
+
             continue;
+        }
 
         /*
-         * The first [N] is the number of RAID devices.
-         * The second [...] is the actual RAID bitmap.
+         * We are now inside the md0 section.
+         *
+         * Look for:
+         *
+         *     [4/4] [UUUU]
+         *     [4/3] [_UUU]
          */
         {
             char *p;
-            char *end;
 
-            p = strchr(line, '[');
+            p = line;
 
-            if (!p)
-                break;
+            while ((p = strchr(p, '[')) != NULL) {
 
-            p = strchr(p + 1, '[');
+                int total;
+                int active;
 
-            if (!p)
-                break;
+                if (sscanf(
+                        p,
+                        "[%d/%d]",
+                        &total,
+                        &active) == 2) {
 
-            end = strchr(p, ']');
+                    char *bitmap;
+                    char *end;
+                    size_t len;
 
-            if (!end)
-                break;
+                    bitmap = p;
 
-            {
-                size_t len;
+                    /*
+                     * Skip the [4/4] block.
+                     */
+                    end = strchr(bitmap, ']');
 
-                len = (size_t)(end - p + 1);
+                    if (!end)
+                        break;
 
-                if (len >= size)
-                    len = size - 1;
+                    bitmap = end + 1;
 
-                memcpy(status, p, len);
-                status[len] = '\0';
+                    while (*bitmap == ' ' ||
+                           *bitmap == '\t')
+                        bitmap++;
+
+                    /*
+                     * The next [...] is the actual
+                     * RAID bitmap.
+                     */
+                    if (*bitmap != '[')
+                        break;
+
+                    end = strchr(bitmap, ']');
+
+                    if (!end)
+                        break;
+
+                    len = (size_t)(end - bitmap + 1);
+
+                    if (len >= size)
+                        len = size - 1;
+
+                    memcpy(
+                        status,
+                        bitmap,
+                        len
+                    );
+
+                    status[len] = '\0';
+
+                    fclose(f);
+                    return;
+                }
+
+                p++;
             }
         }
 
-        break;
+        /*
+         * mdstat sections are separated by a blank line.
+         */
+        if (line[0] == '\n' ||
+            line[0] == '\r')
+            break;
     }
 
     fclose(f);
