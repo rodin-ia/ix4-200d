@@ -70,7 +70,15 @@ static int parse_string_field(
 
     p += strlen(field);
 
-    while (*p && (*p == ':' || isspace((unsigned char)*p)))
+    while (*p && isspace((unsigned char)*p))
+        p++;
+
+    if (*p != ':')
+        return -1;
+
+    p++;
+
+    while (*p && isspace((unsigned char)*p))
         p++;
 
     snprintf(out, out_size, "%s", p);
@@ -99,8 +107,13 @@ static int find_md_device(char *device, size_t size)
         if (!isdigit((unsigned char)md[2]))
             continue;
 
-        snprintf(device, size, "/dev/%.*s",
-                 (int)(size - 6), md);
+        snprintf(
+            device,
+            size,
+            "/dev/%.*s",
+            (int)(size - 6),
+            md
+        );
 
         fclose(f);
         return 0;
@@ -119,7 +132,12 @@ static int get_raid_info(const char *device, struct raid_info *info)
 
     memset(info, 0, sizeof(*info));
 
-    snprintf(info->device, sizeof(info->device), "%s", device);
+    snprintf(
+        info->device,
+        sizeof(info->device),
+        "%s",
+        device
+    );
 
     snprintf(
         command,
@@ -249,19 +267,39 @@ void page_space(void)
     if (strncmp(device, "/dev/", 5) == 0)
         short_device = device + 5;
 
-    snprintf(line, sizeof(line), "ARRAY: %s", short_device);
+    snprintf(
+        line,
+        sizeof(line),
+        "ARRAY: %s",
+        short_device
+    );
     menu_line(3, line);
 
-    snprintf(line, sizeof(line), "LEVEL: %s", info.level);
+    snprintf(
+        line,
+        sizeof(line),
+        "LEVEL: %s",
+        info.level
+    );
     menu_line(4, line);
 
-    snprintf(line, sizeof(line), "STATE: %s", info.state);
+    snprintf(
+        line,
+        sizeof(line),
+        "STATE: %s",
+        info.state
+    );
     menu_line(5, line);
 
     rebuild = get_rebuild_percent(info.rebuild);
 
     if (rebuild >= 0) {
-        snprintf(line, sizeof(line), "REBUILD: %d%%", rebuild);
+        snprintf(
+            line,
+            sizeof(line),
+            "REBUILD: %d%%",
+            rebuild
+        );
         menu_line(6, line);
     }
     else if (strcmp(info.state, "clean") == 0) {
