@@ -11,7 +11,6 @@
 void page_device(void);
 void page_space(void);
 void page_ip(void);
-void page_datetime(void);
 void page_storage(void);
 
 /* Common LCD functions */
