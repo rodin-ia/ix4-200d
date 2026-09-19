@@ -99,7 +99,8 @@ static int find_md_device(char *device, size_t size)
         if (!isdigit((unsigned char)md[2]))
             continue;
 
-        snprintf(device, size, "/dev/%s", md);
+        snprintf(device, size, "/dev/%.*s",
+                 (int)(size - 6), md);
 
         fclose(f);
         return 0;
@@ -221,7 +222,7 @@ void page_space(void)
 {
     struct raid_info info;
     char device[32];
-    char line[64];
+    char line[128];
     const char *short_device;
     int rebuild;
 
@@ -262,11 +263,14 @@ void page_space(void)
     if (rebuild >= 0) {
         snprintf(line, sizeof(line), "REBUILD: %d%%", rebuild);
         menu_line(6, line);
-    } else if (strcmp(info.state, "clean") == 0) {
+    }
+    else if (strcmp(info.state, "clean") == 0) {
         menu_line(6, "HEALTH: OK");
-    } else if (strstr(info.state, "degraded")) {
+    }
+    else if (strstr(info.state, "degraded")) {
         menu_line(6, "HEALTH: DEGRADED");
-    } else {
+    }
+    else {
         menu_line(6, "HEALTH: UNKNOWN");
     }
 }
