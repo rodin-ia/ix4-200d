@@ -75,4 +75,6 @@ void menu_page(int page)
         page_device();
         break;
     }
+
+    lcd_log_page(page);
 }
