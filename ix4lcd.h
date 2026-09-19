@@ -12,6 +12,8 @@ void page_device(void);
 void page_space(void);
 void page_ip(void);
 void page_storage(void);
+void page_bays(void);
+
 
 /* Common LCD functions */
 void lcd_clear(void);
