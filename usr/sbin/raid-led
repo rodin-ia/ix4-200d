@@ -1,0 +1,40 @@
+#!/bin/sh
+
+LED="/sys/class/leds/red:status"
+MD="/sys/block/md0/md"
+
+led_off() {
+    echo none > "$LED/trigger"
+    echo 0 > "$LED/brightness"
+}
+
+led_on() {
+    echo none > "$LED/trigger"
+    echo 1 > "$LED/brightness"
+}
+
+led_blink() {
+    echo timer > "$LED/trigger"
+    echo 500 > "$LED/delay_on"
+    echo 500 > "$LED/delay_off"
+}
+
+while :; do
+    action=$(cat "$MD/sync_action" 2>/dev/null)
+    degraded=$(cat "$MD/degraded" 2>/dev/null)
+
+    case "$action" in
+        recover|resync|repair|reshape)
+            led_blink
+            ;;
+        *)
+            if [ "$degraded" = "1" ]; then
+                led_on
+            else
+                led_off
+            fi
+            ;;
+    esac
+
+    sleep 5
+done
