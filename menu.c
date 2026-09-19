@@ -67,6 +67,10 @@ void menu_page(int page)
     case 3:
         page_storage();
         break;
+    
+    case 4:
+        page_bays();
+        break;
 
     default:
         page_device();
