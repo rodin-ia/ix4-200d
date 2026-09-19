@@ -14,7 +14,8 @@ SRC := \
 	page_device.c \
 	page_space.c \
 	page_ip.c \
-	page_storage.c
+	page_storage.c \
+	page_bays.c
 
 OBJ := $(SRC:.c=.o)
 
