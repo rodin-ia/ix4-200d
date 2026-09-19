@@ -10,7 +10,7 @@ touch /tmp/ix4-shutdown
 logger -t ix4-button "Power button pressed, shutting down"
 
 # Show shutdown message on LCD
-/usr/sbin/ix4lcd "                                        system has been shut down, you may turn off the power."
+/usr/bin/ix4lcd "                                        The system shuts down; you can turn off the power once all the LEDs have gone out."
 
 # Turn off white power LED
 LED="/sys/class/leds/white:power"
