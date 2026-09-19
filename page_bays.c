@@ -24,10 +24,9 @@ static int find_disk(
     char *disk,
     size_t size)
 {
-    char path[256];
     char command[256];
     FILE *f;
-    char line[256];
+    char line[32];
 
     snprintf(
         command,
@@ -44,6 +43,7 @@ static int find_disk(
     );
 
     f = popen(command, "r");
+
     if (!f)
         return -1;
 
@@ -60,17 +60,10 @@ static int find_disk(
         return -1;
 
     snprintf(
-        path,
-        sizeof(path),
-        "%s",
-        line
-    );
-
-    snprintf(
         disk,
         size,
-        "%s",
-        path
+        "%.7s",
+        line
     );
 
     return 0;
@@ -173,6 +166,7 @@ static void get_raid_status(
     snprintf(status, size, "N/A");
 
     f = fopen("/proc/mdstat", "r");
+
     if (!f)
         return;
 
@@ -193,13 +187,6 @@ static void get_raid_status(
         if (strcmp(md, "md0") != 0)
             continue;
 
-        /*
-         * mdstat contains the RAID bitmap in the form:
-         *
-         * [UUUU]
-         * [_UUU]
-         * [UU_U]
-         */
         {
             char *p;
 
@@ -243,6 +230,7 @@ static void format_bay_line(
     memset(state, 0, sizeof(state));
 
     if (info->disk[0]) {
+
         snprintf(
             model,
             sizeof(model),
@@ -266,7 +254,9 @@ static void format_bay_line(
             model,
             state
         );
+
     } else {
+
         snprintf(
             line,
             size,
@@ -353,7 +343,7 @@ void page_bays(void)
     snprintf(
         line,
         sizeof(line),
-        "RAID: md0 %s",
+        "RAID: md0 %.10s",
         raid_status
     );
 
