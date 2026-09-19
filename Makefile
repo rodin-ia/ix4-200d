@@ -1,6 +1,6 @@
 TARGET := ix4lcd
 
-CC = "$HOME/build_dir/openwrt/staging_dir/toolchain-arm_xscale_gcc-14.4.0_musl_eabi/bin/arm-openwrt-linux-muslgnueabi-gcc"
+CC = /home/master/build_dir/openwrt/staging_dir/toolchain-arm_xscale_gcc-14.4.0_musl_eabi/bin/arm-openwrt-linux-muslgnueabi-gcc
 
 CFLAGS := -march=armv5te -O2 -Wall -Wextra
 
