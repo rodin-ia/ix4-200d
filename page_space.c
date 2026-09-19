@@ -604,8 +604,6 @@ void page_space_detail(void)
             device,
             sizeof(device)) != 0) {
 
-        menu_title("ARRAY");
-
         menu_line(2, "ARRAY: N/A");
         menu_line(3, "REBUILD: N/A");
         menu_line(4, "LEFT: N/A");
