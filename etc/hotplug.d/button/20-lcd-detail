@@ -1,0 +1,6 @@
+#!/bin/sh
+
+[ "$BUTTON" = "BTN_0" ] || exit 0
+[ "$ACTION" = "pressed" ] || exit 0
+
+/usr/bin/ix4lcd --button detail
