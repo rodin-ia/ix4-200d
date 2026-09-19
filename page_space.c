@@ -296,6 +296,7 @@ static int get_rebuild_time(
             mins = total_minutes % 60;
 
             if (hours > 0) {
+
                 snprintf(
                     buf,
                     size,
@@ -303,7 +304,9 @@ static int get_rebuild_time(
                     hours,
                     mins
                 );
+
             } else {
+
                 snprintf(
                     buf,
                     size,
@@ -362,10 +365,12 @@ static void display_state(
         memcpy(first, state, len);
         first[len] = '\0';
 
-        line[0] = '\0';
-
-        strcpy(line, "ST: ");
-        strcat(line, first);
+        snprintf(
+            line,
+            sizeof(line),
+            "ST: %s",
+            first
+        );
 
         menu_line(4, line);
 
@@ -394,10 +399,12 @@ static void display_state(
     memcpy(first, state, first_len);
     first[first_len] = '\0';
 
-    line[0] = '\0';
-
-    strcpy(line, "ST: ");
-    strcat(line, first);
+    snprintf(
+        line,
+        sizeof(line),
+        "ST: %s",
+        first
+    );
 
     menu_line(4, line);
 
@@ -410,6 +417,89 @@ static void display_state(
     second[second_len] = '\0';
 
     menu_line(5, second);
+}
+
+static void display_state_detail(
+    const char *state)
+{
+    char first[22];
+    char second[22];
+
+    size_t len;
+    size_t first_len;
+    size_t i;
+
+    const char *p;
+    const char *last_space;
+
+    if (!state || !*state) {
+        menu_line(5, "STATE: N/A");
+        menu_line(6, "");
+        return;
+    }
+
+    len = strlen(state);
+
+    if (len <= 14) {
+
+        char line[22];
+
+        snprintf(
+            line,
+            sizeof(line),
+            "STATE: %s",
+            state
+        );
+
+        menu_line(5, line);
+        menu_line(6, "");
+
+        return;
+    }
+
+    /*
+     * "STATE: " uses 7 characters, leaving 14 characters
+     * on the first line.
+     */
+    first_len = 14;
+    last_space = NULL;
+
+    for (i = 0; i < first_len; i++) {
+
+        if (state[i] == ' ')
+            last_space = state + i;
+    }
+
+    if (last_space) {
+
+        first_len = (size_t)(last_space - state);
+        p = last_space + 1;
+
+    } else {
+
+        p = state + first_len;
+    }
+
+    memcpy(first, state, first_len);
+    first[first_len] = '\0';
+
+    snprintf(
+        second,
+        sizeof(second),
+        "STATE: %s",
+        first
+    );
+
+    menu_line(5, second);
+
+    snprintf(
+        second,
+        sizeof(second),
+        "%s",
+        p
+    );
+
+    menu_line(6, second);
 }
 
 void page_space(void)
@@ -506,18 +596,21 @@ void page_space_detail(void)
     const char *short_device;
 
     int rebuild;
+    int detail;
 
-    menu_title("ARRAY");
+    detail = detail_get();
 
     if (find_md_device(
             device,
             sizeof(device)) != 0) {
 
+        menu_title("ARRAY");
+
         menu_line(2, "ARRAY: N/A");
-        menu_line(3, "ACTIVE: N/A");
-        menu_line(4, "WORKING: N/A");
-        menu_line(5, "FAILED: N/A");
-        menu_line(6, "SPARE: N/A");
+        menu_line(3, "REBUILD: N/A");
+        menu_line(4, "LEFT: N/A");
+        menu_line(5, "ACTIVE: N/A");
+        menu_line(6, "WORKING: N/A");
 
         return;
     }
@@ -526,11 +619,13 @@ void page_space_detail(void)
             device,
             &info) != 0) {
 
+        menu_title("ARRAY");
+
         menu_line(2, "ARRAY: N/A");
-        menu_line(3, "ACTIVE: N/A");
-        menu_line(4, "WORKING: N/A");
-        menu_line(5, "FAILED: N/A");
-        menu_line(6, "SPARE: N/A");
+        menu_line(3, "REBUILD: N/A");
+        menu_line(4, "LEFT: N/A");
+        menu_line(5, "ACTIVE: N/A");
+        menu_line(6, "WORKING: N/A");
 
         return;
     }
@@ -539,6 +634,110 @@ void page_space_detail(void)
 
     if (strncmp(device, "/dev/", 5) == 0)
         short_device = device + 5;
+
+    menu_title("ARRAY");
+
+    if (detail == 1) {
+
+        /*
+         * Detail screen 1:
+         *
+         * ARRAY
+         * REBUILD
+         * LEFT
+         * ACTIVE
+         * WORKING
+         * FAILED
+         */
+
+        snprintf(
+            line,
+            sizeof(line),
+            "ARRAY: %s",
+            short_device
+        );
+
+        menu_line(2, line);
+
+        rebuild = get_rebuild_percent(info.rebuild);
+
+        if (rebuild >= 0) {
+
+            snprintf(
+                line,
+                sizeof(line),
+                "REBUILD: %d%%",
+                rebuild
+            );
+
+            menu_line(3, line);
+
+            if (get_rebuild_time(
+                    rebuild_time,
+                    sizeof(rebuild_time)) == 0) {
+
+                snprintf(
+                    line,
+                    sizeof(line),
+                    "LEFT: %s",
+                    rebuild_time
+                );
+
+                menu_line(4, line);
+
+            } else {
+
+                menu_line(4, "LEFT: N/A");
+            }
+
+        } else {
+
+            menu_line(3, "REBUILD: NONE");
+            menu_line(4, "LEFT: N/A");
+        }
+
+        snprintf(
+            line,
+            sizeof(line),
+            "ACTIVE: %d/%d",
+            info.active_devices,
+            info.raid_devices
+        );
+
+        menu_line(5, line);
+
+        snprintf(
+            line,
+            sizeof(line),
+            "WORKING: %d/%d",
+            info.working_devices,
+            info.total_devices
+        );
+
+        menu_line(6, line);
+
+        /*
+         * FAILED is shown in the logical log because the
+         * first detail screen has only five content rows.
+         */
+        lcd_log(
+            "FAILED: %d",
+            info.failed_devices
+        );
+
+        return;
+    }
+
+    /*
+     * Detail screen 2:
+     *
+     * ARRAY
+     * SPARE
+     * RAID DEVICES
+     * TOTAL DEVICES
+     * STATE
+     * state continuation
+     */
 
     snprintf(
         line,
@@ -549,64 +748,32 @@ void page_space_detail(void)
 
     menu_line(2, line);
 
-    rebuild = get_rebuild_percent(info.rebuild);
+    snprintf(
+        line,
+        sizeof(line),
+        "SPARE: %d",
+        info.spare_devices
+    );
 
-    if (rebuild >= 0 &&
-        get_rebuild_time(
-            rebuild_time,
-            sizeof(rebuild_time)) == 0) {
-
-        snprintf(
-            line,
-            sizeof(line),
-            "REBUILD: %d%%",
-            rebuild
-        );
-
-        menu_line(3, line);
-
-        snprintf(
-            line,
-            sizeof(line),
-            "LEFT: %s",
-            rebuild_time
-        );
-
-        menu_line(4, line);
-
-    } else {
-
-        menu_line(3, "REBUILD: NONE");
-        menu_line(4, "LEFT: N/A");
-    }
+    menu_line(3, line);
 
     snprintf(
         line,
         sizeof(line),
-        "ACTIVE: %d/%d",
-        info.active_devices,
+        "RAID DEV: %d",
         info.raid_devices
+    );
+
+    menu_line(4, line);
+
+    snprintf(
+        line,
+        sizeof(line),
+        "TOTAL DEV: %d",
+        info.total_devices
     );
 
     menu_line(5, line);
 
-    snprintf(
-        line,
-        sizeof(line),
-        "WORKING: %d/%d",
-        info.working_devices,
-        info.total_devices
-    );
-
-    menu_line(6, line);
-
-    /*
-     * FAILED and SPARE do not fit together on the last
-     * available row, so they are shown in the log for now.
-     */
-    lcd_log(
-        "failed=%d spare=%d",
-        info.failed_devices,
-        info.spare_devices
-    );
+    display_state_detail(info.state);
 }
