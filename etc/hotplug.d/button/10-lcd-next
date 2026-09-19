@@ -3,7 +3,7 @@
 [ "$BUTTON" = "BTN_1" ] || exit 0
 [ "$ACTION" = "pressed" ] || exit 0
 
-/root/ix4lcd --page next
+/usr/bin/ix4lcd --page next
 
 #logger -t ix4lcd "NEXT button pressed"
 
