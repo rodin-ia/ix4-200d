@@ -272,15 +272,13 @@ void page_ip(void)
             "eth1: DOWN"
         );
 
-    menu_title("ADDRESS");
-
     snprintf(
         line,
         sizeof(line),
         "IP: %s",
         ip
     );
-    menu_line(2, line);
+    menu_line(1, line);
 
     snprintf(
         line,
@@ -288,7 +286,7 @@ void page_ip(void)
         "MSK: %s",
         mask
     );
-    menu_line(3, line);
+    menu_line(2, line);
 
     snprintf(
         line,
@@ -296,7 +294,7 @@ void page_ip(void)
         "GW: %s",
         gateway
     );
-    menu_line(4, line);
+    menu_line(3, line);
 
     snprintf(
         line,
@@ -304,7 +302,8 @@ void page_ip(void)
         "MODE: %s",
         mode
     );
-    menu_line(5, line);
+    menu_line(4, line);
 
-    menu_line(6, eth0);
+    menu_line(5, eth0);
+    menu_line(6, eth1);
 }
