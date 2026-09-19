@@ -40,6 +40,7 @@ void menu_line(int row, const char *text)
 
 void menu_page(int page)
 {
+    lcd_log_reset();
     lcd_clear();
 
     lcd_text(1, 0, "+-------------------+");
