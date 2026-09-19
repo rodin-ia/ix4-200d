@@ -28,8 +28,11 @@ void menu_line(int row, const char *text);
 void menu_page(int page);
 
 void lcd_log(const char *fmt, ...);
+
 void lcd_log_page(int page);
 void lcd_log_reset(void);
+
+/* Button simulation */
 
 void simulate_button(const char *button);
 
@@ -40,11 +43,13 @@ void page_set(int page);
 
 void page_next(void);
 
-/* Detail mode */
+/* Detail navigation */
 
 int detail_get(void);
 void detail_set(int detail);
-void detail_toggle(void);
+void detail_next(void);
+
+/* Menu */
 
 void menu_title(const char *text);
 
