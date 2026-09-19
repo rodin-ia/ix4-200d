@@ -1,4 +1,5 @@
 #include <time.h>
+
 #include "ix4lcd.h"
 
 void page_datetime(void)
@@ -14,6 +15,5 @@ void page_datetime(void)
 
     strftime(buf, sizeof(buf), "%d %b %H:%M:%S", &tm);
 
-    menu_line(3, buf);
+    lcd_text(7, 3, buf);
 }
-
