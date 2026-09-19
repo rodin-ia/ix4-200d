@@ -1,0 +1,23 @@
+#!/bin/sh
+
+[ "$BUTTON" = "reboot" ] || exit 0
+[ "$ACTION" = "pressed" ] || exit 0
+
+# Prevent repeated shutdown events
+[ -e /tmp/ix4-shutdown ] && exit 0
+touch /tmp/ix4-shutdown
+
+logger -t ix4-button "Power button pressed, shutting down"
+
+# Show shutdown message on LCD
+/usr/sbin/ix4lcd "                                        system has been shut down, you may turn off the power."
+
+# Turn off white power LED
+LED="/sys/class/leds/white:power"
+echo none > "$LED/trigger"
+echo 0 > "$LED/brightness"
+
+# Give LCD and LED time to update
+sleep 2
+
+/sbin/poweroff
