@@ -3,20 +3,30 @@
 LED="/sys/class/leds/red:status"
 MD="/sys/block/md0/md"
 
-led_off() {
-    echo none > "$LED/trigger"
-    echo 0 > "$LED/brightness"
-}
+mode=""
 
-led_on() {
-    echo none > "$LED/trigger"
-    echo 1 > "$LED/brightness"
-}
+set_mode() {
+    new_mode="$1"
 
-led_blink() {
-    echo timer > "$LED/trigger"
-    echo 500 > "$LED/delay_on"
-    echo 500 > "$LED/delay_off"
+    [ "$new_mode" = "$mode" ] && return
+
+    case "$new_mode" in
+        off)
+            echo none > "$LED/trigger"
+            echo 0 > "$LED/brightness"
+            ;;
+        on)
+            echo none > "$LED/trigger"
+            echo 1 > "$LED/brightness"
+            ;;
+        blink)
+            echo timer > "$LED/trigger"
+            echo 500 > "$LED/delay_on"
+            echo 500 > "$LED/delay_off"
+            ;;
+    esac
+
+    mode="$new_mode"
 }
 
 while :; do
@@ -25,13 +35,13 @@ while :; do
 
     case "$action" in
         recover|resync|repair|reshape)
-            led_blink
+            set_mode blink
             ;;
         *)
             if [ "$degraded" = "1" ]; then
-                led_on
+                set_mode on
             else
-                led_off
+                set_mode off
             fi
             ;;
     esac
