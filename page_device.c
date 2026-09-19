@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
+
 #include "ix4lcd.h"
 
 void page_device(void)
@@ -13,5 +14,5 @@ void page_device(void)
 
     menu_title("DEVICE NAME");
 
-    menu_line(3, hostname);
+    lcd_text(7, 3, hostname);
 }
