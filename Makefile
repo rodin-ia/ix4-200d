@@ -1,6 +1,9 @@
 TARGET := ix4lcd
 
-CC = /home/master/build_dir/openwrt/staging_dir/toolchain-arm_xscale_gcc-14.4.0_musl_eabi/bin/arm-openwrt-linux-muslgnueabi-gcc
+OPENWRT_DIR := /home/master/build_dir/openwrt
+STAGING_DIR := $(OPENWRT_DIR)/staging_dir
+
+CC := $(STAGING_DIR)/toolchain-arm_xscale_gcc-14.4.0_musl_eabi/bin/arm-openwrt-linux-muslgnueabi-gcc
 
 CFLAGS := -march=armv5te -O2 -Wall -Wextra
 
@@ -21,10 +24,10 @@ OBJ := $(SRC:.c=.o)
 all: $(TARGET)
 
 $(TARGET): $(OBJ)
-	$(CC) $(CFLAGS) -o $@ $^
+	STAGING_DIR=$(STAGING_DIR) $(CC) $(CFLAGS) -o $@ $^
 
 %.o: %.c ix4lcd.h
-	$(CC) $(CFLAGS) -c $< -o $@
+	STAGING_DIR=$(STAGING_DIR) $(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -f $(OBJ) $(TARGET)
