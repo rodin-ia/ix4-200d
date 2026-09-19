@@ -240,10 +240,15 @@ static void display_state(const char *state)
 {
     char first[18];
     char second[22];
-    const char *p;
-    const char *last_space;
+    char line[22];
+
     size_t len;
     size_t first_len;
+    size_t second_len;
+    size_t i;
+
+    const char *p;
+    const char *last_space;
 
     if (!state || !*state) {
         menu_line(4, "ST:");
@@ -253,44 +258,66 @@ static void display_state(const char *state)
     len = strlen(state);
 
     /*
-     * First line:
-     *
-     * "ST: " = 4 characters
-     * remaining space = 17 characters
+     * "ST: " uses 4 characters.
+     * The first state line can therefore contain 17 characters.
      */
 
     if (len <= 17) {
-        snprintf(first, sizeof(first), "ST: %s", state);
-        menu_line(4, first);
+        memcpy(first, state, len);
+        first[len] = '\0';
+
+        line[0] = '\0';
+        strcpy(line, "ST: ");
+        strcat(line, first);
+
+        menu_line(4, line);
         return;
     }
 
-    memcpy(first, state, 17);
-    first[17] = '\0';
+    /*
+     * Find the last word boundary within the first 17 characters.
+     */
 
-    last_space = strrchr(first, ' ');
+    first_len = 17;
+    last_space = NULL;
+
+    for (i = 0; i < first_len; i++) {
+        if (state[i] == ' ')
+            last_space = state + i;
+    }
 
     if (last_space) {
-        first_len = (size_t)(last_space - first);
-
-        if (first_len > 0) {
-            first[first_len] = '\0';
-            p = last_space + 1;
-        } else {
-            p = state + 17;
-        }
+        first_len = (size_t)(last_space - state);
+        p = last_space + 1;
     } else {
-        p = state + 17;
+        p = state + first_len;
     }
 
-    {
-        char line[22];
+    /*
+     * First line: "ST: " + state fragment.
+     */
 
-        snprintf(line, sizeof(line), "ST: %s", first);
-        menu_line(4, line);
-    }
+    memcpy(first, state, first_len);
+    first[first_len] = '\0';
 
-    snprintf(second, sizeof(second), "%s", p);
+    line[0] = '\0';
+    strcpy(line, "ST: ");
+    strcat(line, first);
+
+    menu_line(4, line);
+
+    /*
+     * Second line is limited to the LCD width.
+     */
+
+    second_len = strlen(p);
+
+    if (second_len > 21)
+        second_len = 21;
+
+    memcpy(second, p, second_len);
+    second[second_len] = '\0';
+
     menu_line(5, second);
 }
 
