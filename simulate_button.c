@@ -5,7 +5,7 @@
 
 #define PAGE_FILE "/tmp/ix4lcd-page"
 #define PAGE_MIN  0
-#define PAGE_MAX  3
+#define PAGE_MAX  4
 
 int page_get(void)
 {
