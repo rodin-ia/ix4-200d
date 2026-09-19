@@ -427,6 +427,7 @@ static void display_state_detail(
 
     size_t len;
     size_t first_len;
+    size_t second_len;
     size_t i;
 
     const char *p;
@@ -440,26 +441,25 @@ static void display_state_detail(
 
     len = strlen(state);
 
+    /*
+     * "STATE: " uses 7 characters,
+     * leaving 14 characters for the state.
+     */
     if (len <= 14) {
 
-        char line[22];
+        memcpy(first, "STATE: ", 7);
+        memcpy(first + 7, state, len);
+        first[7 + len] = '\0';
 
-        snprintf(
-            line,
-            sizeof(line),
-            "STATE: %s",
-            state
-        );
-
-        menu_line(5, line);
+        menu_line(5, first);
         menu_line(6, "");
 
         return;
     }
 
     /*
-     * "STATE: " uses 7 characters, leaving 14 characters
-     * on the first line.
+     * Find a space within the first 14 characters,
+     * so we do not split a word if possible.
      */
     first_len = 14;
     last_space = NULL;
@@ -480,24 +480,35 @@ static void display_state_detail(
         p = state + first_len;
     }
 
-    memcpy(first, state, first_len);
-    first[first_len] = '\0';
+    /*
+     * First line:
+     *
+     * STATE: clean,
+     */
+    memcpy(first, "STATE: ", 7);
 
-    snprintf(
-        second,
-        sizeof(second),
-        "STATE: %s",
-        first
-    );
+    if (first_len > 14)
+        first_len = 14;
 
-    menu_line(5, second);
+    memcpy(first + 7, state, first_len);
+    first[7 + first_len] = '\0';
 
-    snprintf(
-        second,
-        sizeof(second),
-        "%s",
-        p
-    );
+    menu_line(5, first);
+
+    /*
+     * Second line:
+     *
+     * degraded, recovering
+     *
+     * Limit it explicitly to 21 LCD characters.
+     */
+    second_len = strlen(p);
+
+    if (second_len > 21)
+        second_len = 21;
+
+    memcpy(second, p, second_len);
+    second[second_len] = '\0';
 
     menu_line(6, second);
 }
@@ -604,11 +615,12 @@ void page_space_detail(void)
             device,
             sizeof(device)) != 0) {
 
-        menu_line(2, "ARRAY: N/A");
-        menu_line(3, "REBUILD: N/A");
-        menu_line(4, "LEFT: N/A");
-        menu_line(5, "ACTIVE: N/A");
-        menu_line(6, "WORKING: N/A");
+        menu_line(1, "ARRAY: N/A");
+        menu_line(2, "REBUILD: N/A");
+        menu_line(3, "LEFT: N/A");
+        menu_line(4, "ACTIVE: N/A");
+        menu_line(5, "WORKING: N/A");
+        menu_line(6, "FAILED: N/A");
 
         return;
     }
@@ -617,13 +629,12 @@ void page_space_detail(void)
             device,
             &info) != 0) {
 
-        menu_title("ARRAY");
-
-        menu_line(2, "ARRAY: N/A");
-        menu_line(3, "REBUILD: N/A");
-        menu_line(4, "LEFT: N/A");
-        menu_line(5, "ACTIVE: N/A");
-        menu_line(6, "WORKING: N/A");
+        menu_line(1, "ARRAY: N/A");
+        menu_line(2, "REBUILD: N/A");
+        menu_line(3, "LEFT: N/A");
+        menu_line(4, "ACTIVE: N/A");
+        menu_line(5, "WORKING: N/A");
+        menu_line(6, "FAILED: N/A");
 
         return;
     }
@@ -633,19 +644,17 @@ void page_space_detail(void)
     if (strncmp(device, "/dev/", 5) == 0)
         short_device = device + 5;
 
-    menu_title("ARRAY");
-
     if (detail == 1) {
 
         /*
          * Detail screen 1:
          *
-         * ARRAY
-         * REBUILD
-         * LEFT
-         * ACTIVE
-         * WORKING
-         * FAILED
+         * ARRAY: md0
+         * REBUILD: 23%
+         * LEFT: 139m
+         * ACTIVE: 3/4
+         * WORKING: 4/4
+         * FAILED: 0
          */
 
         snprintf(
@@ -655,7 +664,7 @@ void page_space_detail(void)
             short_device
         );
 
-        menu_line(2, line);
+        menu_line(1, line);
 
         rebuild = get_rebuild_percent(info.rebuild);
 
@@ -668,7 +677,7 @@ void page_space_detail(void)
                 rebuild
             );
 
-            menu_line(3, line);
+            menu_line(2, line);
 
             if (get_rebuild_time(
                     rebuild_time,
@@ -681,17 +690,17 @@ void page_space_detail(void)
                     rebuild_time
                 );
 
-                menu_line(4, line);
+                menu_line(3, line);
 
             } else {
 
-                menu_line(4, "LEFT: N/A");
+                menu_line(3, "LEFT: N/A");
             }
 
         } else {
 
-            menu_line(3, "REBUILD: NONE");
-            menu_line(4, "LEFT: N/A");
+            menu_line(2, "REBUILD: NONE");
+            menu_line(3, "LEFT: N/A");
         }
 
         snprintf(
@@ -702,7 +711,7 @@ void page_space_detail(void)
             info.raid_devices
         );
 
-        menu_line(5, line);
+        menu_line(4, line);
 
         snprintf(
             line,
@@ -712,16 +721,16 @@ void page_space_detail(void)
             info.total_devices
         );
 
-        menu_line(6, line);
+        menu_line(5, line);
 
-        /*
-         * FAILED is shown in the logical log because the
-         * first detail screen has only five content rows.
-         */
-        lcd_log(
+        snprintf(
+            line,
+            sizeof(line),
             "FAILED: %d",
             info.failed_devices
         );
+
+        menu_line(6, line);
 
         return;
     }
@@ -729,12 +738,12 @@ void page_space_detail(void)
     /*
      * Detail screen 2:
      *
-     * ARRAY
-     * SPARE
-     * RAID DEVICES
-     * TOTAL DEVICES
-     * STATE
-     * state continuation
+     * ARRAY: md0
+     * SPARE: 1
+     * RAID DEV: 4
+     * TOTAL DEV: 4
+     * STATE: clean,
+     * degraded, recovering
      */
 
     snprintf(
@@ -744,7 +753,7 @@ void page_space_detail(void)
         short_device
     );
 
-    menu_line(2, line);
+    menu_line(1, line);
 
     snprintf(
         line,
@@ -753,7 +762,7 @@ void page_space_detail(void)
         info.spare_devices
     );
 
-    menu_line(3, line);
+    menu_line(2, line);
 
     snprintf(
         line,
@@ -762,7 +771,7 @@ void page_space_detail(void)
         info.raid_devices
     );
 
-    menu_line(4, line);
+    menu_line(3, line);
 
     snprintf(
         line,
@@ -771,7 +780,7 @@ void page_space_detail(void)
         info.total_devices
     );
 
-    menu_line(5, line);
+    menu_line(4, line);
 
     display_state_detail(info.state);
 }
