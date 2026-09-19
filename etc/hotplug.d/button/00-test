@@ -1,0 +1,2 @@
+#!/bin/sh
+logger -t ix4-button "BUTTON=$BUTTON ACTION=$ACTION SEEN=$SEEN"
