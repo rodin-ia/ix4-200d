@@ -222,7 +222,7 @@ void page_space(void)
 {
     struct raid_info info;
     char device[32];
-    char line[128];
+    char line[256];
     const char *short_device;
     int rebuild;
 
