@@ -65,10 +65,6 @@ void menu_page(int page)
         break;
 
     case 3:
-        page_datetime();
-        break;
-
-    case 4:
         page_storage();
         break;
 
