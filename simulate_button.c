@@ -3,9 +3,14 @@
 
 #include "ix4lcd.h"
 
-#define PAGE_FILE "/tmp/ix4lcd-page"
-#define PAGE_MIN  0
-#define PAGE_MAX  4
+#define PAGE_FILE   "/tmp/ix4lcd-page"
+#define DETAIL_FILE "/tmp/ix4lcd-detail"
+
+#define PAGE_MIN 0
+#define PAGE_MAX 4
+
+#define DETAIL_MIN 0
+#define DETAIL_MAX 2
 
 int page_get(void)
 {
@@ -51,27 +56,87 @@ void page_set(int page)
 
 void page_next(void)
 {
-    int page = page_get();
+    int page;
+
+    page = page_get();
 
     page++;
 
     if (page > PAGE_MAX)
         page = PAGE_MIN;
 
+    /*
+     * Changing the main page always resets detail mode.
+     */
+    detail_set(DETAIL_MIN);
+
     page_set(page);
     menu_page(page);
 }
 
-void page_prev(void)
+int detail_get(void)
 {
-    int page = page_get();
+    FILE *f;
+    int detail;
 
-    page--;
+    f = fopen(DETAIL_FILE, "r");
 
-    if (page < PAGE_MIN)
-        page = PAGE_MAX;
+    if (!f)
+        return DETAIL_MIN;
 
-    page_set(page);
+    if (fscanf(f, "%d", &detail) != 1) {
+        fclose(f);
+        return DETAIL_MIN;
+    }
+
+    fclose(f);
+
+    if (detail < DETAIL_MIN || detail > DETAIL_MAX)
+        return DETAIL_MIN;
+
+    return detail;
+}
+
+void detail_set(int detail)
+{
+    FILE *f;
+
+    if (detail < DETAIL_MIN)
+        detail = DETAIL_MIN;
+
+    if (detail > DETAIL_MAX)
+        detail = DETAIL_MAX;
+
+    f = fopen(DETAIL_FILE, "w");
+
+    if (!f)
+        return;
+
+    fprintf(f, "%d\n", detail);
+    fclose(f);
+}
+
+void detail_next(void)
+{
+    int page;
+    int detail;
+
+    page = page_get();
+    detail = detail_get();
+
+    /*
+     * Only ARRAY currently has detail screens.
+     */
+    if (page != 1)
+        return;
+
+    detail++;
+
+    if (detail > DETAIL_MAX)
+        detail = DETAIL_MIN;
+
+    detail_set(detail);
+
     menu_page(page);
 }
 
@@ -84,13 +149,13 @@ void simulate_button(const char *button)
         return;
     }
 
-    if (strcmp(button, "prev") == 0) {
-        page_prev();
+    if (strcmp(button, "detail") == 0) {
+        detail_next();
         return;
     }
 
     fprintf(stderr,
             "Unknown button: %s\n"
-            "Available: next, prev\n",
+            "Available: next, detail\n",
             button);
 }

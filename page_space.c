@@ -40,11 +40,14 @@ static void trim(char *s)
     *end = '\0';
 }
 
-static int parse_int_field(const char *line, const char *field)
+static int parse_int_field(
+    const char *line,
+    const char *field)
 {
     const char *p;
 
     p = strstr(line, field);
+
     if (!p)
         return -1;
 
@@ -65,6 +68,7 @@ static int parse_string_field(
     const char *p;
 
     p = strstr(line, field);
+
     if (!p)
         return -1;
 
@@ -87,17 +91,21 @@ static int parse_string_field(
     return 0;
 }
 
-static int find_md_device(char *device, size_t size)
+static int find_md_device(
+    char *device,
+    size_t size)
 {
     FILE *f;
     char line[256];
     char md[32];
 
     f = fopen("/proc/mdstat", "r");
+
     if (!f)
         return -1;
 
     while (fgets(line, sizeof(line), f)) {
+
         if (sscanf(line, "%31s", md) != 1)
             continue;
 
@@ -124,7 +132,9 @@ static int find_md_device(char *device, size_t size)
     return -1;
 }
 
-static int get_raid_info(const char *device, struct raid_info *info)
+static int get_raid_info(
+    const char *device,
+    struct raid_info *info)
 {
     FILE *f;
     char command[128];
@@ -147,64 +157,66 @@ static int get_raid_info(const char *device, struct raid_info *info)
     );
 
     f = popen(command, "r");
+
     if (!f)
         return -1;
 
     while (fgets(line, sizeof(line), f)) {
 
         if (strstr(line, "Raid Level")) {
+
             parse_string_field(
                 line,
                 "Raid Level",
                 info->level,
                 sizeof(info->level)
             );
-        }
 
-        else if (strstr(line, "State")) {
+        } else if (strstr(line, "State")) {
+
             parse_string_field(
                 line,
                 "State",
                 info->state,
                 sizeof(info->state)
             );
-        }
 
-        else if (strstr(line, "Rebuild Status")) {
+        } else if (strstr(line, "Rebuild Status")) {
+
             parse_string_field(
                 line,
                 "Rebuild Status",
                 info->rebuild,
                 sizeof(info->rebuild)
             );
-        }
 
-        else if (strstr(line, "Raid Devices")) {
+        } else if (strstr(line, "Raid Devices")) {
+
             info->raid_devices =
                 parse_int_field(line, "Raid Devices");
-        }
 
-        else if (strstr(line, "Total Devices")) {
+        } else if (strstr(line, "Total Devices")) {
+
             info->total_devices =
                 parse_int_field(line, "Total Devices");
-        }
 
-        else if (strstr(line, "Active Devices")) {
+        } else if (strstr(line, "Active Devices")) {
+
             info->active_devices =
                 parse_int_field(line, "Active Devices");
-        }
 
-        else if (strstr(line, "Working Devices")) {
+        } else if (strstr(line, "Working Devices")) {
+
             info->working_devices =
                 parse_int_field(line, "Working Devices");
-        }
 
-        else if (strstr(line, "Failed Devices")) {
+        } else if (strstr(line, "Failed Devices")) {
+
             info->failed_devices =
                 parse_int_field(line, "Failed Devices");
-        }
 
-        else if (strstr(line, "Spare Devices")) {
+        } else if (strstr(line, "Spare Devices")) {
+
             info->spare_devices =
                 parse_int_field(line, "Spare Devices");
         }
@@ -218,7 +230,8 @@ static int get_raid_info(const char *device, struct raid_info *info)
     return 0;
 }
 
-static int get_rebuild_percent(const char *rebuild)
+static int get_rebuild_percent(
+    const char *rebuild)
 {
     const char *p;
 
@@ -236,7 +249,97 @@ static int get_rebuild_percent(const char *rebuild)
     return atoi(p);
 }
 
-static void display_state(const char *state)
+static int get_rebuild_time(
+    char *buf,
+    size_t size)
+{
+    FILE *f;
+    char line[256];
+    char *p;
+    char *end;
+    double minutes;
+
+    snprintf(buf, size, "N/A");
+
+    f = fopen("/proc/mdstat", "r");
+
+    if (!f)
+        return -1;
+
+    while (fgets(line, sizeof(line), f)) {
+
+        if (!strstr(line, "recovery =") &&
+            !strstr(line, "resync ="))
+            continue;
+
+        p = strstr(line, "finish=");
+
+        if (!p)
+            continue;
+
+        p += strlen("finish=");
+
+        minutes = strtod(p, &end);
+
+        if (end == p)
+            continue;
+
+        if (strstr(end, "min")) {
+
+            int total_minutes;
+            int hours;
+            int mins;
+
+            total_minutes = (int)(minutes + 0.5);
+
+            hours = total_minutes / 60;
+            mins = total_minutes % 60;
+
+            if (hours > 0) {
+
+                snprintf(
+                    buf,
+                    size,
+                    "%dh%02dm",
+                    hours,
+                    mins
+                );
+
+            } else {
+
+                snprintf(
+                    buf,
+                    size,
+                    "%dm",
+                    mins
+                );
+            }
+
+        } else if (strstr(end, "sec")) {
+
+            int seconds;
+
+            seconds = (int)(minutes + 0.5);
+
+            snprintf(
+                buf,
+                size,
+                "%ds",
+                seconds
+            );
+        }
+
+        fclose(f);
+        return 0;
+    }
+
+    fclose(f);
+
+    return -1;
+}
+
+static void display_state(
+    const char *state)
 {
     char first[18];
     char second[22];
@@ -257,58 +360,53 @@ static void display_state(const char *state)
 
     len = strlen(state);
 
-    /*
-     * "ST: " uses 4 characters.
-     * The first state line can therefore contain 17 characters.
-     */
-
     if (len <= 17) {
+
         memcpy(first, state, len);
         first[len] = '\0';
 
-        line[0] = '\0';
-        strcpy(line, "ST: ");
-        strcat(line, first);
+        snprintf(
+            line,
+            sizeof(line),
+            "ST: %s",
+            first
+        );
 
         menu_line(4, line);
+
         return;
     }
-
-    /*
-     * Find the last word boundary within the first 17 characters.
-     */
 
     first_len = 17;
     last_space = NULL;
 
     for (i = 0; i < first_len; i++) {
+
         if (state[i] == ' ')
             last_space = state + i;
     }
 
     if (last_space) {
+
         first_len = (size_t)(last_space - state);
         p = last_space + 1;
+
     } else {
+
         p = state + first_len;
     }
-
-    /*
-     * First line: "ST: " + state fragment.
-     */
 
     memcpy(first, state, first_len);
     first[first_len] = '\0';
 
-    line[0] = '\0';
-    strcpy(line, "ST: ");
-    strcat(line, first);
+    snprintf(
+        line,
+        sizeof(line),
+        "ST: %s",
+        first
+    );
 
     menu_line(4, line);
-
-    /*
-     * Second line is limited to the LCD width.
-     */
 
     second_len = strlen(p);
 
@@ -321,31 +419,136 @@ static void display_state(const char *state)
     menu_line(5, second);
 }
 
+static void display_state_detail(
+    const char *state)
+{
+    char first[22];
+    char second[22];
+
+    size_t len;
+    size_t first_len;
+    size_t second_len;
+    size_t i;
+
+    const char *p;
+    const char *last_space;
+
+    if (!state || !*state) {
+        menu_line(5, "STATE: N/A");
+        menu_line(6, "");
+        return;
+    }
+
+    len = strlen(state);
+
+    /*
+     * "STATE: " uses 7 characters,
+     * leaving 14 characters for the state.
+     */
+    if (len <= 14) {
+
+        memcpy(first, "STATE: ", 7);
+        memcpy(first + 7, state, len);
+        first[7 + len] = '\0';
+
+        menu_line(5, first);
+        menu_line(6, "");
+
+        return;
+    }
+
+    /*
+     * Find a space within the first 14 characters,
+     * so we do not split a word if possible.
+     */
+    first_len = 14;
+    last_space = NULL;
+
+    for (i = 0; i < first_len; i++) {
+
+        if (state[i] == ' ')
+            last_space = state + i;
+    }
+
+    if (last_space) {
+
+        first_len = (size_t)(last_space - state);
+        p = last_space + 1;
+
+    } else {
+
+        p = state + first_len;
+    }
+
+    /*
+     * First line:
+     *
+     * STATE: clean,
+     */
+    memcpy(first, "STATE: ", 7);
+
+    if (first_len > 14)
+        first_len = 14;
+
+    memcpy(first + 7, state, first_len);
+    first[7 + first_len] = '\0';
+
+    menu_line(5, first);
+
+    /*
+     * Second line:
+     *
+     * degraded, recovering
+     *
+     * Limit it explicitly to 21 LCD characters.
+     */
+    second_len = strlen(p);
+
+    if (second_len > 21)
+        second_len = 21;
+
+    memcpy(second, p, second_len);
+    second[second_len] = '\0';
+
+    menu_line(6, second);
+}
+
 void page_space(void)
 {
     struct raid_info info;
+
     char device[32];
     char line[256];
+
     const char *short_device;
+
     int rebuild;
 
     menu_title("ARRAY");
 
-    if (find_md_device(device, sizeof(device)) != 0) {
+    if (find_md_device(
+            device,
+            sizeof(device)) != 0) {
+
         menu_line(2, "ARRAY: N/A");
         menu_line(3, "LEVEL: N/A");
         menu_line(4, "ST: OFFLINE");
         menu_line(5, "");
         menu_line(6, "REBUILD: N/A");
+
         return;
     }
 
-    if (get_raid_info(device, &info) != 0) {
+    if (get_raid_info(
+            device,
+            &info) != 0) {
+
         menu_line(2, "ARRAY: N/A");
         menu_line(3, "LEVEL: N/A");
         menu_line(4, "ST: UNKNOWN");
         menu_line(5, "");
         menu_line(6, "REBUILD: N/A");
+
         return;
     }
 
@@ -360,6 +563,7 @@ void page_space(void)
         "ARRAY: %s",
         short_device
     );
+
     menu_line(2, line);
 
     snprintf(
@@ -368,6 +572,7 @@ void page_space(void)
         "LEVEL: %s",
         info.level
     );
+
     menu_line(3, line);
 
     display_state(info.state);
@@ -375,14 +580,207 @@ void page_space(void)
     rebuild = get_rebuild_percent(info.rebuild);
 
     if (rebuild >= 0) {
+
         snprintf(
             line,
             sizeof(line),
             "REBUILD: %d%%",
             rebuild
         );
+
         menu_line(6, line);
+
     } else {
+
         menu_line(6, "REBUILD: N/A");
     }
+}
+
+void page_space_detail(void)
+{
+    struct raid_info info;
+
+    char device[32];
+    char line[64];
+    char rebuild_time[32];
+
+    const char *short_device;
+
+    int rebuild;
+    int detail;
+
+    detail = detail_get();
+
+    if (find_md_device(
+            device,
+            sizeof(device)) != 0) {
+
+        menu_line(1, "ARRAY: N/A");
+        menu_line(2, "REBUILD: N/A");
+        menu_line(3, "LEFT: N/A");
+        menu_line(4, "ACTIVE: N/A");
+        menu_line(5, "WORKING: N/A");
+        menu_line(6, "FAILED: N/A");
+
+        return;
+    }
+
+    if (get_raid_info(
+            device,
+            &info) != 0) {
+
+        menu_line(1, "ARRAY: N/A");
+        menu_line(2, "REBUILD: N/A");
+        menu_line(3, "LEFT: N/A");
+        menu_line(4, "ACTIVE: N/A");
+        menu_line(5, "WORKING: N/A");
+        menu_line(6, "FAILED: N/A");
+
+        return;
+    }
+
+    short_device = device;
+
+    if (strncmp(device, "/dev/", 5) == 0)
+        short_device = device + 5;
+
+    if (detail == 1) {
+
+        /*
+         * Detail screen 1:
+         *
+         * ARRAY: md0
+         * REBUILD: 23%
+         * LEFT: 139m
+         * ACTIVE: 3/4
+         * WORKING: 4/4
+         * FAILED: 0
+         */
+
+        snprintf(
+            line,
+            sizeof(line),
+            "ARRAY: %s",
+            short_device
+        );
+
+        menu_line(1, line);
+
+        rebuild = get_rebuild_percent(info.rebuild);
+
+        if (rebuild >= 0) {
+
+            snprintf(
+                line,
+                sizeof(line),
+                "REBUILD: %d%%",
+                rebuild
+            );
+
+            menu_line(2, line);
+
+            if (get_rebuild_time(
+                    rebuild_time,
+                    sizeof(rebuild_time)) == 0) {
+
+                snprintf(
+                    line,
+                    sizeof(line),
+                    "LEFT: %s",
+                    rebuild_time
+                );
+
+                menu_line(3, line);
+
+            } else {
+
+                menu_line(3, "LEFT: N/A");
+            }
+
+        } else {
+
+            menu_line(2, "REBUILD: NONE");
+            menu_line(3, "LEFT: N/A");
+        }
+
+        snprintf(
+            line,
+            sizeof(line),
+            "ACTIVE: %d/%d",
+            info.active_devices,
+            info.raid_devices
+        );
+
+        menu_line(4, line);
+
+        snprintf(
+            line,
+            sizeof(line),
+            "WORKING: %d/%d",
+            info.working_devices,
+            info.total_devices
+        );
+
+        menu_line(5, line);
+
+        snprintf(
+            line,
+            sizeof(line),
+            "FAILED: %d",
+            info.failed_devices
+        );
+
+        menu_line(6, line);
+
+        return;
+    }
+
+    /*
+     * Detail screen 2:
+     *
+     * ARRAY: md0
+     * SPARE: 1
+     * RAID DEV: 4
+     * TOTAL DEV: 4
+     * STATE: clean,
+     * degraded, recovering
+     */
+
+    snprintf(
+        line,
+        sizeof(line),
+        "ARRAY: %s",
+        short_device
+    );
+
+    menu_line(1, line);
+
+    snprintf(
+        line,
+        sizeof(line),
+        "SPARE: %d",
+        info.spare_devices
+    );
+
+    menu_line(2, line);
+
+    snprintf(
+        line,
+        sizeof(line),
+        "RAID DEV: %d",
+        info.raid_devices
+    );
+
+    menu_line(3, line);
+
+    snprintf(
+        line,
+        sizeof(line),
+        "TOTAL DEV: %d",
+        info.total_devices
+    );
+
+    menu_line(4, line);
+
+    display_state_detail(info.state);
 }

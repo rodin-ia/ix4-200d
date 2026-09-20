@@ -40,6 +40,8 @@ void menu_line(int row, const char *text)
 
 void menu_page(int page)
 {
+    int detail;
+
     lcd_log_reset();
     lcd_clear();
 
@@ -51,13 +53,19 @@ void menu_page(int page)
         lcd_text(121, row, "|");
     }
 
+    detail = detail_get();
+
     switch (page) {
+
     case 0:
         page_device();
         break;
 
     case 1:
-        page_space();
+        if (detail == 1 || detail == 2)
+            page_space_detail();
+        else
+            page_space();
         break;
 
     case 2:
@@ -67,7 +75,7 @@ void menu_page(int page)
     case 3:
         page_storage();
         break;
-    
+
     case 4:
         page_bays();
         break;
