@@ -1,0 +1,33 @@
+#!/bin/sh
+
+PWM="/sys/class/hwmon/hwmon0/pwm1"
+PWM_ENABLE="/sys/class/hwmon/hwmon0/pwm1_enable"
+STATE="/var/run/ix4-fan-mdraid.state"
+
+while :; do
+    if grep -Eq '[[:space:]](recovery|resync|reshape)[[:space:]]*=' /proc/mdstat; then
+        NEW="full"
+    else
+        NEW="auto"
+    fi
+
+    OLD="$(cat "$STATE" 2>/dev/null)"
+
+    if [ "$NEW" != "$OLD" ]; then
+        case "$NEW" in
+            full)
+                echo 1 > "$PWM_ENABLE"
+                echo 255 > "$PWM"
+                logger -t ix4-fan "RAID rebuild/resync/reshape: fan 100%"
+                ;;
+            auto)
+                echo 2 > "$PWM_ENABLE"
+                logger -t ix4-fan "RAID operation finished: fan automatic"
+                ;;
+        esac
+
+        echo "$NEW" > "$STATE"
+    fi
+
+    sleep 2
+done
